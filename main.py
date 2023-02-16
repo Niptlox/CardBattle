@@ -3,6 +3,8 @@ from typing import List
 import pygame as pg
 import pygame.display
 import random
+
+from GenerateLevel import ROOM_START, ROOM_FINISH
 from data import *
 
 pg.init()
@@ -11,10 +13,19 @@ screen = pygame.display.set_mode(WSIZE, flags=pg.SRCALPHA)
 
 PLAYER_IMG_ID = 0
 img_size = (220, 220)
-imgs = [pygame.image.load(f"sprites/{i}.png") for i in range(7)]
+imgs = [pygame.image.load(f"{i}.png") for i in range(7)]
 shadow_img = pg.Surface(img_size).convert()
 shadow_img.fill("#64748baa")
 shadow_img.set_alpha(220)
+
+SCN_WORLD = 0
+SCN_BATTLE = 1
+scene = SCN_WORLD
+
+
+def set_scene(scene_id):
+    global scene
+    scene = scene_id
 
 
 def get_creature(creature_id):
@@ -35,7 +46,8 @@ class Creature:
         self.options = options
         self.name = options[S_TITLE]
         self.img_id = options[S_IMGID]
-        self.max_health = options[S_HEALTH]
+        self.max_health = options.get(S_HEALTH, -1)
+        self.enemy = options.get(S_ENEMY, False)
         self.health = self.max_health
         self.mana = options.get(S_MANA, -1)
         self.capabilities = capabilities
@@ -213,11 +225,13 @@ class Player(Creature):
         options = {S_HEALTH: 100, S_MANA: 0, S_IMGID: PLAYER_IMG_ID, S_TITLE: "Player"}
         capabilities = get_capabilities(["DefaultPunch", "LightPunch"])
         super(Player, self).__init__(options, capabilities, alive=True)
-        self.battle = None
+        self.battle: Battle = None
         self.inventory = Inventory(size=10)
         self.inventory.add_items([("HealthPoison", 3), ("RestoreHealthPoison", 1)])
         self.coins = 0
         self.effects = []
+        self.room: Room = None
+        self.map_level: MapLevel = None
 
     def start_battle(self, opponents):
         """Стартовать битву с оппонентами"""
@@ -231,6 +245,17 @@ class Player(Creature):
             if prop.get(S_HEALTH):
                 self.add_health(prop.get(S_HEALTH))
             self.inventory.get_cnt_of_cell(cell_index)
+
+    def enter_room(self, room):
+        self.room = room
+        if room.check_enemy():
+            self.battle = Battle(self, room.get_enemy())
+
+    def leave_room(self):
+        if self.battle and self.battle.running:
+            return False
+        self.room = None
+        return True
 
 
 PLAYER = 1
@@ -286,6 +311,54 @@ class Battle:
         self.in_room = False
 
 
+
+
+
+class Room:
+    def __init__(self, creatures, position=(0, 0), flag=0):
+        self.creatures = creatures
+        self.position = position
+        self.flag = flag
+
+    def generate(self, difficult=0):
+        self.creatures = []
+
+    def get_enemy(self):
+        return [crt for crt in self.creatures if crt.enemy]
+
+    def check_enemy(self):
+        return self.get_enemy()
+
+    @property
+    def is_start(self):
+        return self.flag & ROOM_START
+
+    @property
+    def is_finish(self):
+        return self.flag & ROOM_FINISH
+
+
+class MapLevel:
+    def __init__(self):
+        self.rooms = []
+        self.connections = []
+        self.difficult = 0
+
+    def generate(self, difficult=0):
+        if difficult == 0:
+            cnt_rooms = 9
+            max_cnt_in_room = 5
+            crts = [("BlackCat", 3)]
+            rooms = [Room([], (0, 0), flag=ROOM_START)]
+            cnt = len(rooms)
+            while cnt < cnt_rooms:
+                pass
+
+
+
+
+
+
 running = True
 
 
@@ -321,14 +394,15 @@ def color_of_health_percent(health_percent):
     return color
 
 
-def battle(player: Player, _opponents):
-    battle = player.start_battle(_opponents)
+def scene_battle(battle):
+    set_scene(SCN_BATTLE)
+    player = battle.player
     end_ui = []
-    end_ui.append(Label(((WSIZE[0] - 200) // 2, (WSIZE[1] - 40) // 2, 200, 40),
-                        "YOU WIN" if battle.win == PLAYER else "YOU DIED",
-                        background="black", text_color="red", font=font_a1))
-    end_ui.append(Button(((WSIZE[0] - 200) // 2, (WSIZE[1] - 40) // 2+50, 200, 40), "Выйти из комнаты",
-                         on_click=lambda _b: battle.exit_at_room))
+    end_label = Label(((WSIZE[0] - 200) // 2, (WSIZE[1] - 40) // 2, 200, 40), "", background="black", text_color="red",
+                      font=font_a1)
+    end_ui.append(end_label)
+    end_ui.append(Button(((WSIZE[0] - 200) // 2, (WSIZE[1] - 40) // 2 + 50, 200, 40), "Выйти из комнаты",
+                         on_click=lambda _b: set_scene(SCN_WORLD)))
     ui_objects = []
     ui_objects.append(Label((10, 310, 220, 30), "Способности", text_color="white", background="black"))
     ui_objects.append(Label((610, 310, 220, 30), "Инвентарь", text_color="white", background="black"))
@@ -338,8 +412,7 @@ def battle(player: Player, _opponents):
                                  on_click=lambda _b, _cap=cap: battle.player_punch(_cap)))
         y += 25 + 10
 
-    while running and battle.in_room:
-        print(running and battle.in_room, running , battle.in_room)
+    while running and scene == SCN_BATTLE:
 
         screen.fill("black")
 
@@ -388,13 +461,28 @@ def battle(player: Player, _opponents):
                 battle.opponent_move()
             pg_update(ui_objects + fast_ui)
         else:
-
+            end_label.set_text("YOU WIN" if battle.win == PLAYER else "YOU DIED")
             pg_update(end_ui)
 
 
+def scene_world(map_level):
+    set_scene(SCN_WORLD)
+    ui_objects = []
+    while running and scene == SCN_WORLD:
+        screen.fill("black")
+
+        pg_update(ui_objects)
+
+
+# map_level = MapLevel()
+# map_level.generate(0)
 player = Player()
 exit_battle = False
 opponents = [get_creature("BlackCat"), get_creature("BlackCat"), get_creature("CryCat")]
-battle(player, opponents)
+room = Room(opponents)
+player.enter_room(room)
+
+scene_battle(player.battle)
+scene_world(None)
 while running:
     pg_update([])
