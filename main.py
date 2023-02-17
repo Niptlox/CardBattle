@@ -4,7 +4,9 @@ import pygame as pg
 import pygame.display
 import random
 
-from GenerateLevel import ROOM_START, ROOM_FINISH
+from pygame import Vector2
+
+from GenerateLevel import ROOM_START, ROOM_FINISH, generate_level
 from data import *
 
 pg.init()
@@ -20,7 +22,8 @@ shadow_img.set_alpha(220)
 
 SCN_WORLD = 0
 SCN_BATTLE = 1
-scene = SCN_WORLD
+SCN_MAPLEVEL = 2
+scene = SCN_MAPLEVEL
 
 
 def set_scene(scene_id):
@@ -31,6 +34,19 @@ def set_scene(scene_id):
 def get_creature(creature_id):
     options = Creatures[creature_id]
     return Creature(options, get_capabilities(options["capabilities"]))
+
+
+def get_creatures(creature_ids):
+    return [get_creature(cr_id) for cr_id in creature_ids]
+
+
+def random_creatures_from_list(init_lst, difficult=0):
+    max_diff_offset = max([abs(Creatures[cr_id][S_DIFFICULT] - difficult) for cr_id, cnt in init_lst]) * 2
+    get_chance = lambda cr_id: max_diff_offset / (max_diff_offset - abs(Creatures[cr_id][S_DIFFICULT] - difficult))
+    unpack_list = [cr_id for cr_id, cnt in init_lst for _ in range(cnt)]
+    chances = [get_chance(cr_id) for cr_id, cnt in init_lst for _ in range(cnt)]
+    creatures = random.choices(unpack_list, chances)
+    return creatures
 
 
 def get_capability(cap_id):
@@ -311,17 +327,29 @@ class Battle:
         self.in_room = False
 
 
-
-
-
 class Room:
-    def __init__(self, creatures, position=(0, 0), flag=0):
+    def __init__(self, creatures, position=(0, 0), flag=0, difficult=0, auto_generate=False, room_id=-1):
         self.creatures = creatures
         self.position = position
         self.flag = flag
+        self.difficult = difficult
+        self.room_id = room_id
+        if auto_generate:
+            self.generate(difficult)
 
     def generate(self, difficult=0):
+        self.difficult = difficult
         self.creatures = []
+        if self.flag & ROOM_START:
+            return
+        if self.flag & ROOM_FINISH:
+            return
+        if 1 <= difficult <= 4:
+            crts = [("BlackCat", difficult + 1)]
+        else:
+            crts = []
+        creatures_ids = random_creatures_from_list(crts, difficult)
+        self.creatures = get_creatures(creatures_ids)
 
     def get_enemy(self):
         return [crt for crt in self.creatures if crt.enemy]
@@ -339,24 +367,26 @@ class Room:
 
 
 class MapLevel:
-    def __init__(self):
+    def __init__(self, difficult=0, auto_generate=False):
         self.rooms = []
         self.connections = []
-        self.difficult = 0
+        self.difficult = difficult
+        if auto_generate:
+            self.generate(self.difficult)
 
     def generate(self, difficult=0):
+        self.difficult = difficult
+        space = 1
+        self.rooms = []
         if difficult == 0:
-            cnt_rooms = 9
-            max_cnt_in_room = 5
-            crts = [("BlackCat", 3)]
-            rooms = [Room([], (0, 0), flag=ROOM_START)]
-            cnt = len(rooms)
-            while cnt < cnt_rooms:
-                pass
+            return
+        cnt_rooms = 5 + difficult + random.randint(int(difficult ** 0.2), int(difficult ** 0.5))
+        g_rooms, self.connections = generate_level(cnt_rooms)
 
-
-
-
+        for g_room in g_rooms:
+            room_id, dif_room, pos, flag = g_room
+            pos = pos[0] * space, pos[1] * space
+            self.rooms.append(Room([], pos, flag=ROOM_START, difficult=dif_room, auto_generate=True, room_id=room_id))
 
 
 running = True
@@ -465,24 +495,51 @@ def scene_battle(battle):
             pg_update(end_ui)
 
 
-def scene_world(map_level):
-    set_scene(SCN_WORLD)
+font = pg.font.SysFont("arial", 15)
+
+
+def scene_maplevel(map_level):
+    set_scene(SCN_MAPLEVEL)
     ui_objects = []
-    while running and scene == SCN_WORLD:
+    rooms = map_level.rooms
+    offset_x, offset_y = WSIZE[0] // 2, WSIZE[1] // 2
+    print(offset_x, offset_y)
+    cof_scale = 50
+    room_size = cof_scale // 3 * 2
+    convert_room_pos = lambda _room: (offset_x + _room.position[0] * cof_scale,
+                                      offset_y + _room.position[1] * cof_scale)
+    while running and scene == SCN_MAPLEVEL:
         screen.fill("black")
+        pg.draw.circle(screen, "red", (offset_x, offset_y), 10)
+        for room in rooms:
+            pg.draw.rect(screen, "white", (convert_room_pos(room), (room_size, room_size)))
+            screen.blit(font.render(str(room.difficult)+";"+str(room.room_id), True, "black"), convert_room_pos(room))
+        c = 30
+        print(map_level.rooms)
+        print(map_level.connections)
+        for room_id1 in map_level.connections:
+            for room_id2 in map_level.connections[room_id1]:
+                color = (c, c, c)
+                c += 5
+                pos1 = Vector2(convert_room_pos(rooms[room_id1])) + Vector2(room_size) // 2
+                pos2 = Vector2(convert_room_pos(rooms[room_id2])) + Vector2(room_size) // 2
+                print(room_id1, room_id2, pos1, pos2, rooms[room_id1].position, rooms[room_id2].position)
+                pg.draw.line(screen, color, pos1, pos2, 4)
 
         pg_update(ui_objects)
+        break
 
 
-# map_level = MapLevel()
-# map_level.generate(0)
 player = Player()
-exit_battle = False
+map_level = MapLevel(1, True)
+print(map_level.rooms)
+scene_maplevel(map_level)
+
 opponents = [get_creature("BlackCat"), get_creature("BlackCat"), get_creature("CryCat")]
 room = Room(opponents)
 player.enter_room(room)
 
-scene_battle(player.battle)
-scene_world(None)
+# scene_battle(player.battle)
+# scene_world(None)
 while running:
     pg_update([])

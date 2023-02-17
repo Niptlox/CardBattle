@@ -22,6 +22,7 @@ S_RESTORING_HEALTH = "restoring_health"
 S_CAPABILITIES = "capabilities"
 S_MAX_CELL_CNT = "max_cell_cnt"
 S_ENEMY = "enemy"
+S_DIFFICULT = "difficult"
 
 S_PUNCH_DAMAGE = "punch_damage"
 S_PUNCH_DAMAGE_MIN = "punch_damage_min"
@@ -34,8 +35,10 @@ Capabilities = {
     "LightPunch": {S_ANCESTOR: "DefaultPunch", S_TITLE: "Light Punch", S_PUNCH_DAMAGE_MIN: 5, S_PUNCH_DAMAGE_MAX: 7,}
 }
 Creatures = {
-    "BlackCat": {S_TITLE: "ЪУЪ", S_IMGID: 5, S_HEALTH: 50, S_CAPABILITIES: ["DefaultPunch", ], S_ENEMY: True},
-    "CryCat": {S_TITLE: "Cry cat", S_IMGID: 6, S_HEALTH: 30, S_CAPABILITIES: ["LightPunch", ], S_ENEMY: True},
+    "BlackCat": {S_TITLE: "ЪУЪ", S_IMGID: 5, S_HEALTH: 50, S_CAPABILITIES: ["DefaultPunch", ], S_ENEMY: True,
+                 S_DIFFICULT: 2},
+    "CryCat": {S_TITLE: "Cry cat", S_IMGID: 6, S_HEALTH: 30, S_CAPABILITIES: ["LightPunch", ], S_ENEMY: True,
+               S_DIFFICULT: 1},
 }
 
 # Виды ввода эффекта: "id effect"; {S_ANCESTOR: "id effect", }; ("id effect", steps); ("id effect", steps, mul_cof))
