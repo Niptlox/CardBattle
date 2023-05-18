@@ -6,7 +6,7 @@ import random
 
 from pygame import Vector2
 
-from GenerateLevel import ROOM_START, ROOM_FINISH, generate_level
+from GenerateLevel import ROOM_START, ROOM_FINISH, generate_level, create_level
 from data import *
 
 pg.init()
@@ -365,6 +365,12 @@ class Room:
     def is_finish(self):
         return self.flag & ROOM_FINISH
 
+    def __str__(self):
+        return f"Room<#{self.room_id}; {self.position}>"
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class MapLevel:
     def __init__(self, difficult=0, auto_generate=False):
@@ -381,8 +387,7 @@ class MapLevel:
         if difficult == 0:
             return
         cnt_rooms = 5 + difficult + random.randint(int(difficult ** 0.2), int(difficult ** 0.5))
-        g_rooms, self.connections = generate_level(cnt_rooms)
-
+        g_rooms, self.connections = create_level(cnt_rooms)
         for g_room in g_rooms:
             room_id, dif_room, pos, flag = g_room
             pos = pos[0] * space, pos[1] * space
@@ -508,32 +513,51 @@ def scene_maplevel(map_level):
     room_size = cof_scale // 3 * 2
     convert_room_pos = lambda _room: (offset_x + _room.position[0] * cof_scale,
                                       offset_y + _room.position[1] * cof_scale)
+    room_id1 = 0
+    print(map_level.connections)
+    print(rooms)
     while running and scene == SCN_MAPLEVEL:
         screen.fill("black")
         pg.draw.circle(screen, "red", (offset_x, offset_y), 10)
+        c = 30
+
+        # for room_id1 in map_level.connections:
+
+        if 1:
+            for room_id1 in map_level.connections:
+                for room_id2 in map_level.connections[room_id1]:
+                    color = (c, c, c)
+                    c += 5
+                    pos1 = Vector2(convert_room_pos(rooms[room_id1])) + Vector2(room_size) // 2
+                    pos2 = Vector2(convert_room_pos(rooms[room_id2])) + Vector2(room_size) // 2
+                    # print(room_id1, room_id2, pos1, pos2, rooms[room_id1].position, rooms[room_id2].position)
+                    pg.draw.line(screen, color, pos1, pos2, 4)
+
         for room in rooms:
             pg.draw.rect(screen, "white", (convert_room_pos(room), (room_size, room_size)))
             screen.blit(font.render(str(room.difficult)+";"+str(room.room_id), True, "black"), convert_room_pos(room))
-        c = 30
-        print(map_level.rooms)
-        print(map_level.connections)
-        for room_id1 in map_level.connections:
-            for room_id2 in map_level.connections[room_id1]:
-                color = (c, c, c)
-                c += 5
-                pos1 = Vector2(convert_room_pos(rooms[room_id1])) + Vector2(room_size) // 2
-                pos2 = Vector2(convert_room_pos(rooms[room_id2])) + Vector2(room_size) // 2
-                print(room_id1, room_id2, pos1, pos2, rooms[room_id1].position, rooms[room_id2].position)
-                pg.draw.line(screen, color, pos1, pos2, 4)
+        # print(map_level.rooms)
+        # print(map_level.connections)
 
-        pg_update(ui_objects)
-        break
+        for event in pg_update_iter(ui_objects):
+            # print(event)
+            if event.type == pg.KEYDOWN:
+                room_id1 += 1
+                room_id1 = room_id1 % len(map_level.connections)
+                print(room_id1, map_level.connections[room_id1])
+                if event.key == pg.K_ESCAPE:
+                    set_scene(SCN_BATTLE)
+
+
+        # pg_update(ui_objects)
+    # break
 
 
 player = Player()
-map_level = MapLevel(1, True)
-print(map_level.rooms)
-scene_maplevel(map_level)
+while 1:
+    map_level = MapLevel(1, True)
+    print(map_level.rooms)
+    scene_maplevel(map_level)
 
 opponents = [get_creature("BlackCat"), get_creature("BlackCat"), get_creature("CryCat")]
 room = Room(opponents)
