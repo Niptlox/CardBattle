@@ -120,8 +120,32 @@ def create_level(cnt_rooms):
         #
         #         room_connect.append(room2[0])
 
-        connections[room[0]] = room_connect
-    print(check_group_of_rooms(connections))
+
+        for rc in room_connect:
+            connections[room[0]].append(rc)
+            connections[rc].append(room[0])
+    group_of_rooms =  check_group_of_rooms(connections)
+    print("check_group_of_rooms", group_of_rooms)
+    for i in range(1, len(group_of_rooms)):
+        group1 = group_of_rooms[i-1]
+        group2 = group_of_rooms[i]
+        min_d = 1e9
+        best_conn = ()
+        for r1 in group1:
+            rpos = rooms[r1][2]
+            for r2 in group2:
+                rpos2 = rooms[r2][2]
+                d = dist(rpos2, rpos)
+                if d < min_d:
+                    min_d = d
+                    best_conn = r1, r2
+        r1, r2 = best_conn
+        connections[r1].append(r2)
+        connections[r2].append(r1)
+
+
+    print("rooms", rooms)
+    print("connections", connections)
     return rooms, connections
 
 

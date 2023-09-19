@@ -366,7 +366,7 @@ class Room:
         return self.flag & ROOM_FINISH
 
     def __str__(self):
-        return f"Room<#{self.room_id}; {self.position}>"
+        return f"Room<#{self.room_id}; {self.position}; {self.creatures}>"
 
     def __repr__(self):
         return self.__str__()
@@ -563,7 +563,7 @@ opponents = [get_creature("BlackCat"), get_creature("BlackCat"), get_creature("C
 room = Room(opponents)
 player.enter_room(room)
 
-# scene_battle(player.battle)
+scene_battle(player.battle)
 # scene_world(None)
 while running:
     pg_update([])
